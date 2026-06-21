@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ご褒美ガチャ（仮）</title>
+    <title>ご褒美ガチャ（マルチ版）</title>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #4a90e2; }
+        h1 { text-align: center; color: #4a90e2; margin-bottom: 10px; }
+        
+        /* 👥 ユーザー選択エリアのスタイル */
+        .user-selector-box { background: #fff; padding: 10px; border-radius: 8px; border: 2px solid #4a90e2; text-align: center; margin-bottom: 20px; }
+        .user-select { font-size: 1.1rem; padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer; font-weight: bold; }
+        
         .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
         .status-box { background: #eef5fc; padding: 15px; border-radius: 8px; text-align: center; font-size: 1.2rem; font-weight: bold; }
         .stone-count { color: #f5a623; font-size: 1.8rem; }
@@ -29,6 +34,14 @@
 
 <div class="container">
     <h1>ご褒美ガチャ（仮）</h1>
+
+    <div class="user-selector-box">
+        👤 操作するユーザー: 
+        <select id="userSelect" class="user-select" onchange="changeUser()">
+            <option value="user1">ユーザー 1</option>
+            <option value="user2">ユーザー 2</option>
+        </select>
+    </div>
 
     <div class="section status-box">
         💎 所持石数: <span id="stoneCount" class="stone-count">0</span> 個
@@ -55,20 +68,33 @@
 
 <script>
     // ⚠️【重要】ここにコピーしたGASのウェブアプリURLを貼り付けてください！
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbyuGBlVKZA88S-7ta0qdCMLcVOo96ZJmr3btwRWQrJTIXrpLXuOOu29-nIOtE8sF0ClDg/exec";
+    const GAS_URL = "https://script.google.com/u/0/home/projects/1eqyHa9QXVPlQCnVxXbCnDRjGpKlwPFBlXrAD5M7d90hDsYhneqRVzgGs/edit";
 
     let currentStones = 0;
+    let currentUser = "user1"; // 現在選択されているユーザー（初期値）
 
-    // 起動時にスプレッドシートからデータを取得する
+    // 起動時にデータを取得する
     window.onload = function() {
         fetchAppData();
     };
+
+    // ユーザーが切り替わったときの処理
+    function changeUser() {
+        currentUser = document.getElementById('userSelect').value;
+        // 読み込み中表示にする
+        document.getElementById('taskList').innerHTML = '<li class="loading">データを読み込み中...</li>';
+        document.getElementById('rewardList').innerHTML = '<li class="loading">データを読み込み中...</li>';
+        document.getElementById('gachaResult').innerText = "";
+        fetchAppData();
+    }
 
     // GASと通信してデータを最新にする関数
     function fetchAppData() {
         fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify({ action: "getData" })
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "getData", user: currentUser }) // ★userを一緒に送る
         })
         .then(res => res.json())
         .then(data => {
@@ -120,17 +146,19 @@
         
         fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify({ action: "completeTask", taskId: taskId, stoneReward: stoneReward })
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "completeTask", user: currentUser, taskId: taskId, stoneReward: stoneReward })
         })
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                fetchAppData(); // 画面をリフレッシュ
+                fetchAppData();
             }
         });
     }
 
-// ガチャ実行処理（修正版）
+    // ガチャ実行処理
     function drawGacha() {
         if (currentStones < 30) return;
         const btn = document.getElementById('gachaBtn');
@@ -139,29 +167,23 @@
 
         fetch(GAS_URL, {
             method: "POST",
-            mode: "cors", // ★CORS通信を明示的に指定
-            headers: {
-                "Content-Type": "text/plain" // ★GASとの通信でCORSエラーを回避するための定番の裏技
-            },
-            body: JSON.stringify({ action: "drawGacha" })
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "drawGacha", user: currentUser })
         })
-        .then(res => {
-            if (!res.ok) throw new Error("ネットワーク応答が正常ではありません");
-            return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
             if (data.success) {
                 document.getElementById('gachaResult').innerText = `🎉 当たった：【${data.rarity}】${data.winName}！`;
-                fetchAppData(); // 画面をリフレッシュして石やストックを更新
+                fetchAppData();
             } else {
-                alert("ガチャエラー: " + data.message);
+                alert(data.message);
                 checkGachaButton();
             }
         })
         .catch(err => {
-            // ★万が一エラーになってもフリーズさせず、ボタンを復帰させる
             console.error(err);
-            alert("通信に失敗しました。スプレッドシート側でガチャ処理自体は成功している可能性があります。画面をリロードして確認してください。");
+            alert("通信失敗。リロードして確認してください。");
             document.getElementById('gachaResult').innerText = "";
             checkGachaButton();
         });
@@ -171,7 +193,9 @@
     function useReward(rewardId) {
         fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify({ action: "useReward", rewardId: rewardId })
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "useReward", user: currentUser, rewardId: rewardId })
         })
         .then(res => res.json())
         .then(data => {
@@ -190,7 +214,9 @@
         
         fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify({ action: "resetDaily" })
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "resetDaily", user: currentUser })
         })
         .then(res => res.json())
         .then(data => {
