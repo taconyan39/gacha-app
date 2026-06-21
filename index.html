@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ご褒美ガチャ（仮）</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #4a90e2; }
+        .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
+        .status-box { background: #eef5fc; padding: 15px; border-radius: 8px; text-align: center; font-size: 1.2rem; font-weight: bold; }
+        .stone-count { color: #f5a623; font-size: 1.8rem; }
+        button { background-color: #4a90e2; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .item-list { list-style: none; padding: 0; }
+        .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .gacha-box { text-align: center; padding: 20px; }
+        .gacha-btn { background-color: #ff5a5f; font-size: 1.2rem; padding: 15px 30px; border-radius: 30px; }
+        .gacha-result { margin-top: 15px; font-weight: bold; font-size: 1.1rem; color: #2bc480; min-height: 24px; }
+        .badge { padding: 3px 6px; border-radius: 4px; color: white; font-size: 0.8rem; margin-right: 5px; }
+        .UR { background-color: #ff007f; } .SSR { background-color: #ffaa00; }
+        .SR { background-color: #9b51e0; } .R { background-color: #2f80ed; } .N { background-color: #828282; }
+        .loading { text-align: center; color: #888; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>ご褒美ガチャ（仮）</h1>
+
+    <div class="section status-box">
+        💎 所持石数: <span id="stoneCount" class="stone-count">0</span> 個
+        <div style="margin-top: 10px;">
+            <button onclick="resetDailyTasks()">📅 毎日タスクを一括リセット</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>📋 タスク一覧</h3>
+        <ul id="taskList" class="item-list"><li class="loading">データを読み込み中...</li></ul>
+    </div>
+
+    <div class="section gacha-box">
+        <button id="gachaBtn" class="gacha-btn" onclick="drawGacha()">🎰 ガチャを回す (消費: 30個)</button>
+        <div id="gachaResult" class="gacha-result"></div>
+    </div>
+
+    <div class="section">
+        <h3>🎁 ご褒美ストック</h3>
+        <ul id="rewardList" class="item-list"><li class="loading">データを読み込み中...</li></ul>
+    </div>
+</div>
+
+<script>
+    // ⚠️【重要】ここにコピーしたGASのウェブアプリURLを貼り付けてください！
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyuGBlVKZA88S-7ta0qdCMLcVOo96ZJmr3btwRWQrJTIXrpLXuOOu29-nIOtE8sF0ClDg/exec";
+
+    let currentStones = 0;
+
+    // 起動時にスプレッドシートからデータを取得する
+    window.onload = function() {
+        fetchAppData();
+    };
+
+    // GASと通信してデータを最新にする関数
+    function fetchAppData() {
+        fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "getData" })
+        })
+        .then(res => res.json())
+        .then(data => {
+            currentStones = data.stones;
+            document.getElementById('stoneCount').innerText = currentStones;
+            
+            // タスク一覧の描画
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+            data.tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = 'item-row';
+                const isCompleted = task['ステータス'] === '完了';
+                li.innerHTML = `
+                    <span>${task['タスク名']} (💎${task['獲得石数']}個) [${task['タイプ']}]</span>
+                    <button onclick="completeTask(${task['タスクID']}, ${task['獲得石数']}, this)" ${isCompleted ? 'disabled' : ''}>
+                        ${isCompleted ? '完了済' : '完了'}
+                    </button>
+                `;
+                taskList.appendChild(li);
+            });
+
+            // ご褒美ストックの描画
+            const rewardList = document.getElementById('rewardList');
+            rewardList.innerHTML = '';
+            data.rewards.forEach(reward => {
+                const li = document.createElement('li');
+                li.className = 'item-row';
+                const stock = reward['ストック数'] || 0;
+                li.innerHTML = `
+                    <span><span class="badge ${reward['レアリティ']}">${reward['レアリティ']}</span>${reward['ご褒美名']}</span>
+                    <div>
+                        <span>ストック: ${stock}</span>
+                        <button onclick="useReward(${reward['ご褒美ID']})" ${stock === 0 ? 'disabled' : ''}>消費</button>
+                    </div>
+                `;
+                rewardList.appendChild(li);
+            });
+
+            checkGachaButton();
+        })
+        .catch(err => alert("データ取得エラー: " + err));
+    }
+
+    // タスク完了処理
+    function completeTask(taskId, stoneReward, button) {
+        button.disabled = true;
+        button.innerText = "通信中...";
+        
+        fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "completeTask", taskId: taskId, stoneReward: stoneReward })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                fetchAppData(); // 画面をリフレッシュ
+            }
+        });
+    }
+
+// ガチャ実行処理（修正版）
+    function drawGacha() {
+        if (currentStones < 30) return;
+        const btn = document.getElementById('gachaBtn');
+        btn.disabled = true;
+        document.getElementById('gachaResult').innerText = "🎰 ガチャを回しています...";
+
+        fetch(GAS_URL, {
+            method: "POST",
+            mode: "cors", // ★CORS通信を明示的に指定
+            headers: {
+                "Content-Type": "text/plain" // ★GASとの通信でCORSエラーを回避するための定番の裏技
+            },
+            body: JSON.stringify({ action: "drawGacha" })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("ネットワーク応答が正常ではありません");
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                document.getElementById('gachaResult').innerText = `🎉 当たった：【${data.rarity}】${data.winName}！`;
+                fetchAppData(); // 画面をリフレッシュして石やストックを更新
+            } else {
+                alert("ガチャエラー: " + data.message);
+                checkGachaButton();
+            }
+        })
+        .catch(err => {
+            // ★万が一エラーになってもフリーズさせず、ボタンを復帰させる
+            console.error(err);
+            alert("通信に失敗しました。スプレッドシート側でガチャ処理自体は成功している可能性があります。画面をリロードして確認してください。");
+            document.getElementById('gachaResult').innerText = "";
+            checkGachaButton();
+        });
+    }
+
+    // ご褒美消費処理
+    function useReward(rewardId) {
+        fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "useReward", rewardId: rewardId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("ご褒美を消費しました！贅沢を楽しんでね！");
+                fetchAppData();
+            } else {
+                alert(data.message);
+            }
+        });
+    }
+
+    // 毎日リセット処理
+    function resetDailyTasks() {
+        if(!confirm("毎日タスクをすべて未完了に戻しますか？")) return;
+        
+        fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "resetDaily" })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("毎日タスクをリセットしました！");
+                fetchAppData();
+            }
+        });
+    }
+
+    function checkGachaButton() {
+        const btn = document.getElementById('gachaBtn');
+        btn.disabled = currentStones < 30;
+    }
+</script>
+
+</body>
+</html>
