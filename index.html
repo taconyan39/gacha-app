@@ -112,6 +112,7 @@
                 <select id="newTaskType">
                     <option value="毎日">毎日（リセット対象）</option>
                     <option value="単発">単発（1回きり）</option>
+                    <option value="連続">連続（何回でも押せる）</option> </select>
                 </select>
             </div>
         </div>
@@ -159,20 +160,23 @@
             
             document.getElementById("stoneCount").innerText = data.stones;
             
-            // タスク描画
+           // タスク描画の部分をこれに差し替えてちょうだい
             let taskHtml = "";
-            data.tasks.forEach(t => {
-                const isDone = t.ステータス === "完了";
-                taskHtml += `<div class="list-item">
-                    <div>
-                        <strong>${t.タスク名}</strong> 
-                        <span style="font-size:12px; color:#666;">(${t.タイプ} / 💎${t.獲得石数}個)</span>
-                    </div>`;
-                if (isDone) {
-                    taskHtml += `<span class="status-badge badge-done">完了</span>`;
-                } else {
-                    taskHtml += `<button class="btn btn-primary" onclick="completeTask(${t.タスクID}, ${t.獲得石数})">完了する</button>`;
-                }
+                data.tasks.forEach(t => {
+            // 💡「完了」かつ「連続タイプではない」場合だけ完了バッジにします
+            const isDone = (t.ステータス === "完了" && t.タイプ !== "連続");
+    
+             taskHtml += `<div class="list-item">
+                <div>
+                    <strong>${t.タスク名}</strong> 
+                    <span style="font-size:12px; color:#666;">(${t.タイプ} / 💎${t.獲得石数}個)</span>
+                </div>`;
+            if (isDone) {
+                taskHtml += `<span class="status-badge badge-done">完了</span>`;
+            } else {
+            // 💡連続タイプ、または未完了のタスクはボタンが表示されますわ！
+                taskHtml += `<button class="btn btn-primary" onclick="completeTask(${t.タスクID}, ${t.獲得石数})">完了する</button>`;
+            }
                 taskHtml += `</div>`;
             });
             document.getElementById("taskList").innerHTML = taskHtml || "クエストが登録されていません";
