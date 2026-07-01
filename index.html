@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タスクエ - タスクをゲーム化するアプリ -</title>
+    <title>タスクトレジャー - タスクをゲーム化するアプリ -</title>
     <style>
         :root {
             --primary: #4a90e2;
@@ -52,12 +52,13 @@
             overflow-y: auto;     /* 縦方向にはみ出したら自動でスクロールバーを出します */
             padding-right: 5px;   /* スクロールバーと文字が重ならないための隙間です */
         }
+        #userSelect{display:none;}
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>⚔️ タスクエ</h1>
+    <h1>⚔️ タスクトレジャー</h1>
     <div class="subtitle">- TaskQuest -</div>
 
     <div class="card flex-between">
@@ -94,7 +95,7 @@
     <hr class="hr-divider">
 
     <div class="card" style="background-color: #f1f3f5;">
-        <h3 style="margin-top: 0;">⚙️ タスクエ管理画面</h3>
+        <h3 style="margin-top: 0;">⚙️ タスク管理画面</h3>
         <button class="btn btn-danger" style="width: 100%; margin-bottom: 16px;" onclick="resetDaily()">☀️ 毎日のクエストを未完了にリセットする</button>
         
         <h4 style="margin-bottom: 8px;">➕ クエストの新規追加</h4>
@@ -306,8 +307,19 @@
         } catch(e) { alert("追加に失敗しました"); }
     }
 
-    // 最初の一歩
-    window.onload = loadData;
+    window.onload = function() {
+    // 💡 URLの末尾から「?user=xxxx」の部分を自動で読み取りますの！
+    const urlParams = new URLSearchParams(window.location.search);
+    const userParam = urlParams.get('user');
+    
+    if (userParam) {
+        // 画面のセレクトボックスの値を、URLで指定されたユーザーに強制書き換えします
+        document.getElementById("userSelect").value = userParam;
+    }
+    
+    // そのままデータを読み込みますわ！
+    loadData();
+};
 </script>
 </body>
 </html>
